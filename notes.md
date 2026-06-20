@@ -98,7 +98,226 @@ observe -> think/decide -> act -> observe
 
 处理 worker 冲突时，应要求提供证据并使用共同评价标准，而不是简单投票。
 
+### Evaluator-Optimizer（评估器-优化器）
+
+先生成一个候选结果，再由评估器按照明确标准检查质量，输出可执行的修改意见，然后把
+原结果、评估意见和原始约束一起交给优化器修改。
+
+它不是简单地让模型“再改好一点”，关键区别是：
+
+- 评估标准要提前定义，例如岗位匹配度、事实准确性、格式正确性、语气是否合适；
+- 评估输出要能驱动下一轮修改，不能只写笼统评价；
+- 优化器必须看到原始需求、当前版本和评估反馈，避免改偏；
+- 循环必须有停止条件，避免无意义迭代。
+
+一个可执行的评估输出通常应包含：
+
+- `criterion`：对应哪条评估标准；
+- `passed` 或 `score`：是否通过或得分；
+- `evidence`：判断依据，最好引用原文或输入资料；
+- `issue`：具体问题；
+- `revision_instruction`：下一轮应该如何修改。
+
+`evidence` 很重要，因为它把评价绑定到输入材料或当前输出，能减少 evaluator 凭空挑错，
+也能防止 optimizer 为了满足修改意见而编造不存在的经历、数据或事实。
+
+常见停止条件：
+
+- 达到质量阈值，例如所有必过项通过且总分超过目标；
+- 连续多轮反馈重复或改进很小；
+- 达到最大轮数、最大费用、最大时间等硬限制；
+- evaluator 发现缺少必要输入，继续优化无法可靠完成。
+
+### Workflow Pattern 不等于 Agent
+
+Prompt chaining、routing、parallelization、orchestrator-workers 和
+evaluator-optimizer 都可以是 workflow pattern。即使其中调用了 LLM，也不一定是 Agent。
+
+关键区别在控制流：
+
+- Workflow：程序预先规定步骤和分支，模型通常只完成某一步的生成、分类或评估；
+- Agent：系统会根据观察、上下文、工具结果和停止条件，动态决定下一步要调用哪个工具、
+  是否继续、是否换策略或是否结束。
+
+因此，“用了 LLM”“用了多个步骤”“用了多个模型调用”都不是 Agent 的充分条件。是否存在
+受边界约束的自主决策，才是更重要的判断依据。
+
+### Stage 0 目标场景示例
+
+目标场景：Web 项目运行出错时，让 Agent 协助排查。
+
+这个场景适合 Agent，而不只是普通 workflow，因为错误原因不一定能预先确定。系统可能
+需要先尝试运行项目，观察报错；再根据日志判断是依赖、配置、启动命令、端口、环境变量
+还是代码问题；然后选择读取相关文件、审查最可能出错的代码，或停止并请求人工确认。
+
+适合设置的边界：
+
+- 工具范围限制在明确的 Python 工具文件或白名单命令内；
+- 最大执行步数，例如 5 步；
+- 涉及文件修改、安装依赖、删除文件等操作时需要人工确认；
+- 超时、超过最大轮数、连续失败或缺少关键信息时停止。
+
+### OpenAI Practical Guide 要点
+
+普通 LLM 应用可以包含 LLM 调用或 workflow，但不一定让模型管理执行流程。Agent 的特点是
+用模型根据上下文和中间结果动态决策、选择工具、推进任务，并在需要时停止或交还给用户。
+
+更适合 Agent 的场景包括：
+
+- 需要复杂决策，路径无法完全预先写死；
+- 规则很多、经常变化，固定规则维护成本很高；
+- 依赖非结构化数据，例如自然语言文档、日志、网页、邮件或代码。
+
+一个 Agent 的基础组件通常包括：
+
+- `model`：负责理解任务、推理和决策；
+- `tools`：让 Agent 能搜索、读写文件、调用 API、执行代码等；
+- `instructions`：定义目标、边界、工具使用规则、输出要求和停止条件。
+
+Guardrails 很重要。以 Web 项目排错 Agent 为例，读取敏感环境配置、安装依赖、修改代码、
+删除文件或执行有副作用的命令，都应该触发人工确认。
+
 ## 下次学习
 
-继续学习 `Evaluator-Optimizer（评估器-优化器）`：生成结果后按明确标准评价、提出可执行
-修改意见，再迭代优化，并设置质量阈值和停止条件。
+进入 Stage 1：先学习结构化 JSON 输出，再实现最小 Python Agent loop。
+
+## Stage 1：构建最小 Agent Loop
+
+### JSON 和 Python dict
+
+JSON 是模型和程序之间常用的结构化文本格式。模型返回的 JSON 通常先是字符串，例如：
+
+```python
+text = '{"action": "read_file", "arguments": {"path": "README.md"}}'
+```
+
+在 Python 中需要先解析：
+
+```python
+import json
+
+data = json.loads(text)
+```
+
+解析后，JSON object 会变成 Python `dict`，JSON array 会变成 Python `list`。访问字段时：
+
+```python
+action = data["action"]
+path = data["arguments"]["path"]
+```
+
+Agent 中常见的结构化动作格式：
+
+```json
+{
+  "action": "tool_name",
+  "arguments": {
+    "name": "value"
+  }
+}
+```
+
+其中 `action` 表示模型想调用哪个工具，`arguments` 表示传给工具函数的参数。
+
+### 工具分发和参数 schema
+
+Agent 可以用一个工具表把模型输出的 `action` 映射到 Python 函数：
+
+```python
+def add(a: int, b: int) -> int:
+    return a + b
+
+tools = {"add": add}
+```
+
+如果模型输出：
+
+```python
+data = {
+    "action": "add",
+    "arguments": {"a": 10, "b": 20}
+}
+```
+
+就可以分发执行：
+
+```python
+action = data["action"]
+arguments = data["arguments"]
+tool_func = tools[action]
+result = tool_func(**arguments)
+```
+
+`tool_func(**{"a": 10, "b": 20})` 等价于 `add(a=10, b=20)`。
+
+参数名必须和工具函数的参数 schema 对齐。`add(a, b)` 需要 `a` 和 `b`，不能传
+`{"expression": "2 + 3"}`；`calculator(expression)` 才适合接收 `expression`。
+
+### 为什么要求模型只输出 JSON
+
+Agent 的下一步动作需要由程序解析。如果模型输出自然语言，例如“我会调用 add 工具，把
+10 和 20 相加”，程序还要从文本里猜工具名和参数，容易出错。
+
+因此，在简单 Agent 里可以先要求模型只输出固定 JSON：
+
+```json
+{
+  "action": "add",
+  "arguments": {
+    "a": 10,
+    "b": 20
+  }
+}
+```
+
+这样程序可以稳定读取：
+
+```python
+action = data["action"]
+arguments = data["arguments"]
+```
+
+严格结构化输出是 tool dispatch 的前提。
+
+### 工具结果反馈给模型
+
+工具执行结果不会自动进入模型上下文。程序必须把工具结果作为新的 observation 发回模型，
+模型才能基于结果决定是继续调用工具，还是返回最终答案。
+
+示例：
+
+```text
+用户：10 + 20 等于多少？
+模型：{"action": "add", "arguments": {"a": 10, "b": 20}}
+程序：执行 add(10, 20)，得到 30
+程序发回模型：工具 add 返回结果：30
+模型：10 + 20 等于 30。
+```
+
+如果工具结果已经足够回答用户，就不需要继续调用工具；如果结果不足、工具失败或需要更多
+信息，模型可以继续请求工具调用或停止并说明原因。
+
+### Agent Loop 边界和错误处理
+
+最小 Agent loop 必须有边界：
+
+- `max_steps`：限制最多执行几轮，防止 Agent 无限循环；
+- `timeout`：限制总耗时或单步耗时，防止工具或网络请求卡住；
+- 错误处理：遇到坏输出、未知工具、参数错误或工具异常时返回可控错误，而不是崩溃。
+
+常见错误处理：
+
+```python
+try:
+    data = json.loads(model_output)
+except json.JSONDecodeError:
+    return "Error: model output is not valid JSON."
+```
+
+- 模型输出不是合法 JSON：返回 `model output is not valid JSON`；
+- `action` 不在工具白名单：返回 `unknown or unauthorized tool`；
+- `arguments` 缺少必填参数：返回 `missing required arguments`；
+- 参数类型不对：返回 `arguments must be integers` 等具体信息；
+- 工具内部报错，例如文件不存在：捕获异常并返回可控错误。
+
+工具调用必须以程序注册的 `tools` 白名单为准，不能因为模型请求了危险工具就执行。
