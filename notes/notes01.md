@@ -1,5 +1,40 @@
 # 学习笔记
 
+## Stage 1：最小 Agent Loop 练习补充
+
+### 增加 `multiply` 工具
+
+在最小 Agent loop 里，新增一个工具通常要同时修改三处：
+
+- 工具函数：例如 `def multiply(a: int, b: int) -> int: return a * b`。
+- 工具注册表：例如 `tools = {"add": add, "multiply": multiply}`。
+- 模型结构化输出：`fake_model` 返回的 `action` 必须是 `"multiply"`，参数必须和函数签名一致，例如 `{"a": 6, "b": 7}`。
+
+`tools` 是字典，不是列表。注册工具时使用键值映射，而不是 `append`：
+
+```python
+tools["multiply"] = multiply
+```
+
+或者直接写在字典字面量里：
+
+```python
+tools = {
+    "add": add,
+    "multiply": multiply,
+}
+```
+
+### 工具名为什么必须一致
+
+工具名不是普通的局部变量名，而是 Agent 控制流里的协议字段。模型输出 `action: "multiply"` 后，`agent_loop` 会拿这个字符串去 `tools` 字典中查找对应函数，并进入对应的参数检查分支。如果模型输出、工具注册表、参数检查分支中的名字不一致，就会出现未知工具、跳过正确校验或错误调用。
+
+### 本次代码审查结论
+
+`stage1.py` 的乘法路径已经跑通：`what is 6 times 7` 会经过 `fake_model -> tool_call -> multiply -> tool observation -> final_answer`，最终输出 `Final answer: 42`。
+
+需要注意的小修正：`multiply` 的参数检查分支里，错误消息仍然写着 `add requires...` 和 `add arguments...`。这不会影响正常输入，但会影响排错。更好的写法是让错误消息说 `multiply requires arguments a and b`。
+
 ## Stage 0：理解什么是 Agent
 
 ### Chatbot、Workflow、Agent 与 Multi-Agent

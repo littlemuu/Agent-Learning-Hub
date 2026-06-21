@@ -4,9 +4,13 @@ import json
 def add(a: int, b: int) -> int:
     return a + b
 
+def multiply(a:int,b:int)->int:
+    return a*b
+
 
 tools = {
     "add": add,
+    "multiply":multiply,
 }
 
 
@@ -32,6 +36,18 @@ def fake_model(messages: list[dict]) -> str:
                 "arguments": {
                     "a": 10,
                     "b": 20,
+                },
+            }
+        )
+    
+    if "6" in user_input and "7" in user_input:
+        return json.dumps(
+            {
+                "type":"tool_call",
+                "action": "multiply",
+                "arguments":{
+                    "a":6,
+                    "b":7,
                 },
             }
         )
@@ -79,6 +95,12 @@ def agent_loop(user_input: str, max_steps: int = 5) -> str:
                 return "Error: add requires arguments a and b."
             if not isinstance(arguments["a"], int) or not isinstance(arguments["b"], int):
                 return "Error: add arguments a and b must be integers."
+            
+        if action == "multiply":
+            if "a" not in arguments or "b" not in arguments:
+                return "Error: multiply requires arguments a and b."
+            if not isinstance(arguments["a"], int) or not isinstance(arguments["b"], int):
+                return "Error: multiply arguments a and b must be integers."
 
         tool_func = tools[action]
 
@@ -101,3 +123,5 @@ def agent_loop(user_input: str, max_steps: int = 5) -> str:
 if __name__ == "__main__":
     answer = agent_loop("What is 10 plus 20?")
     print(answer)
+    result=agent_loop("what is 6 times 7")
+    print(result)

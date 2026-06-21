@@ -49,14 +49,18 @@ After the user completes an assessment, lesson, exercise, or stage artifact:
 
 After each completed lesson or study session:
 
-1. Update `notes.md` in Chinese with the concepts learned, important distinctions,
-   practical rules, examples, and corrections from the session.
-2. Organize notes by stage and topic. Prefer concise explanations that the learner
+1. Update the stage-specific note file under `notes/` in Chinese with the concepts
+   learned, important distinctions, practical rules, examples, and corrections
+   from the session.
+2. Use `notes/notes01.md` for Stage 0 and Stage 1 material. Use `notes/notes2.md`
+   for Stage 2 material. Create later note files in the same folder when a new
+   stage starts.
+3. Organize notes by stage and topic. Prefer concise explanations that the learner
    can review independently instead of copying the full conversation.
-3. Keep `notes.md` focused on reusable knowledge. Keep personal assessment,
-   completion evidence, and the next task in `progress.md`.
-4. Before resuming a topic, read both `progress.md` and the relevant section of
-   `notes.md` to avoid unnecessary repetition.
+4. Keep notes focused on reusable knowledge. Keep personal assessment, completion
+   evidence, and the next task in `progress.md`.
+5. Before resuming a topic, read `progress.md` and the relevant note file under
+   `notes/` to avoid unnecessary repetition.
 
 ## Hands-on Learning
 
@@ -90,6 +94,9 @@ After each completed lesson or study session:
 
 - Communicate with the user in Chinese unless they request another language.
 - Preserve the user's existing files and changes.
+- Keep learning notes under `notes/` and practice code under `codes/` unless a
+  stage-specific project needs its own directory.
+- Stage 1 code currently lives at `codes/stage1.py`.
 - Before creating substantial code, state the exercise goal and success criteria.
 - When implementing an exercise with the user, explain important decisions but do
   not hide the core learning work by completing every step without interaction.
