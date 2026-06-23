@@ -97,6 +97,10 @@ After each completed lesson or study session:
 - Keep learning notes under `notes/` and practice code under `codes/` unless a
   stage-specific project needs its own directory.
 - Stage 1 code currently lives at `codes/stage1.py`.
+- When a learning task requires a missing library or local model, proactively
+  identify the dependency, explain its learning purpose and the target Python
+  environment, then request approval to install it. Do not silently install
+  dependencies or download model weights.
 - Before creating substantial code, state the exercise goal and success criteria.
 - When implementing an exercise with the user, explain important decisions but do
   not hide the core learning work by completing every step without interaction.

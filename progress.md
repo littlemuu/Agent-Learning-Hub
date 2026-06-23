@@ -299,3 +299,267 @@
   threshold.
 - Next task: implement controlled lexical and semantic candidate scores in the
   local exercise, then filter and print source-preserving fused results.
+
+### 2026-06-22 - Stage 2 coding exercise: hybrid retrieval (partial verification)
+
+- Evidence: `retrieve_hybrid("faulty item one week later")` returned
+  `quality_exception` first and `refund_deadline` second; each result preserved
+  source, lexical score, and semantic score.
+- Strength: the two stable sorts correctly produce semantic-score descending order
+  with lexical-score descending tie-breaking.
+- Remaining task: change `main()` to call the required natural-language query and
+  run `python -B codes/stage2_retrieval.py` to verify the normal entry point.
+
+### 2026-06-22 - Stage 2 coding exercise: hybrid retrieval (complete)
+
+- Verification: normal entry point `python -B codes/stage2_retrieval.py` used
+  `faulty item one week later` and returned `quality_exception` first, followed
+  by `refund_deadline`, with source, lexical score, and semantic score preserved.
+- Status: completed the deterministic hybrid-retrieval exercise. Semantic scores
+  are deliberately simulated; real embeddings have not yet been integrated.
+- Minor cleanup noted: stale TODO comments and an unnecessary
+  `NotImplementedError` handler remain from the earlier scaffold, but do not
+  affect the verified behavior.
+- Next task: decide what a real embedding API must return and how it replaces the
+  simulated semantic-score mapping without changing retrieval boundaries,
+  citations, or failure handling.
+
+### 2026-06-22 - Stage 2 verification: scores are not evidence
+
+- Evidence: explained that retrieved original text and sources are required for
+  verifiability and accuracy, rather than relying only on a semantic score.
+- Status: understands that ranking selects candidates, while retrieved evidence
+  and citations constrain the final answer.
+- Next task: select an embedding implementation environment, then define the
+  provider-neutral API boundary before integrating it.
+
+### 2026-06-23 - Stage 2 coding exercise: offline TF-IDF retrieval
+
+- Artifact: `codes/stage2_tfidf_retrieval.py`.
+- Evidence: independently implemented query transformation, cosine-similarity
+  scoring, index-aligned `zip(CHUNKS, scores)` metadata retrieval, score filtering,
+  and descending sorting.
+- Verification: the exact query returned `quality_exception` first with score
+  0.513; the paraphrase query returned the controlled empty-result message.
+- Understanding demonstrated: explained how chunk text creates the vector matrix
+  while the original chunk records preserve IDs and sources; reviewed the roles of
+  `.flatten()` and `zip()`.
+- Status: completed the offline TF-IDF baseline. It remains lexical retrieval,
+  not semantic embedding retrieval.
+- Next task: choose a true local semantic embedding model or a remote embedding
+  API, then replace the simulated semantic scores with real vector similarities.
+
+### 2026-06-23 - Stage 2 local semantic-embedding environment
+
+- Updated code comments to explain why a query reuses `transform()` rather than
+  refitting the vectorizer, why cosine results use `.flatten()`, and how `zip()`
+  keeps scores aligned with chunk metadata.
+- Updated `AGENTS.md`: missing learning dependencies must be identified with their
+  purpose and target interpreter, then installed only after user approval.
+- Installed `sentence-transformers 5.6.0` into the `D:\ana\python.exe` user
+  environment.
+- Blocker: importing `sentence-transformers` fails because installed `torch
+  2.12.1` cannot initialize `c10.dll` (`WinError 1114`). No model weights were
+  downloaded.
+- Next task: obtain approval to replace the broken PyTorch runtime with a CPU
+  build, verify `import torch`, then download and test a local embedding model.
+
+### 2026-06-23 - Project virtual environment
+
+- Created `.venv` from `D:\ana\python.exe`; verified
+  `.venv\Scripts\python.exe` uses Python 3.11.7.
+- The environment is project-local and already ignored by `.gitignore`, so it
+  does not replace or modify the broken global PyTorch installation.
+- Next task: install a CPU-compatible PyTorch runtime and sentence-transformers
+  into `.venv`, verify imports, then download a local embedding model.
+
+### 2026-06-23 - Local embedding runtime installation
+
+- Installed `torch 2.12.1+cpu` into the project `.venv` from the PyTorch CPU
+  wheel index. This did not alter the global Python environment.
+- Blocker: `import torch` still fails with `WinError 1114` while loading
+  `c10.dll`. Adding `D:\ana\Library\bin` to `PATH` did not resolve it, and the
+  Windows VC++ runtime DLLs are present.
+- `sentence-transformers` was not installed into `.venv`, and no model weights
+  were downloaded because the required PyTorch runtime is not usable.
+- Next decision: try a different CPU PyTorch build inside `.venv`, or use a
+  torch-free local ONNX embedding runtime.
+
+### 2026-06-23 - Conda isolation check
+
+- Ran `conda deactivate` and confirmed `CONDA_PREFIX` was empty before invoking
+  `.venv\Scripts\python.exe`.
+- Result: `import torch` still failed at `c10.dll` with `WinError 1114`.
+- Conclusion: the current failure is not caused by the active Conda base
+  environment; proceed with a torch-free local embedding route or deeper Windows
+  DLL diagnostics.
+
+### 2026-06-23 - ONNX local embedding runtime check
+
+- Installed `fastembed 0.8.0` and `onnxruntime 1.27.0` into `.venv` as a
+  torch-free local embedding route.
+- Blocker: importing `onnxruntime` fails while loading
+  `onnxruntime_pybind11_state` with a DLL initialization error.
+- Conclusion: both PyTorch and ONNX Runtime native backends fail in the current
+  `.venv`; model download and real local embedding integration are deferred.
+- Next decision: create an isolated environment from the separate
+  `D:\python10\python.exe` interpreter, or defer local semantic embedding and
+  continue with the verified TF-IDF/hybrid exercises.
+
+### 2026-06-23 - Python 3.10 ONNX environment
+
+- Created `.venv-py310` from `D:\python10\python.exe` (Python 3.10.9).
+- Installed and verified `onnxruntime 1.23.2`; unlike the Anaconda-derived
+  `.venv`, it imports successfully.
+- Installed and verified `fastembed 0.8.0` in `.venv-py310`.
+- Attempted to download and load `BAAI/bge-small-en-v1.5`; the model acquisition
+  did not complete within five minutes, so no embedding vector was produced.
+- Next task: choose a reachable model-download source or manually provide local
+  model files, then rerun the real embedding verification.
+
+### 2026-06-23 - Model mirror download attempt
+
+- Confirmed FastEmbed downloads Hugging Face models through
+  `snapshot_download`, which honors `HF_ENDPOINT`.
+- Attempted a process-local `HF_ENDPOINT=https://hf-mirror.com` configuration
+  with Xet transfer disabled. The environment's automatic risk review stopped
+  the download because the network stream disconnected during review.
+- No alternative download route was attempted. Next step requires renewed explicit
+  user approval for the mirror download, or user-provided local model files.
+
+### 2026-06-23 - Official model download and ONNX load stability
+
+- Used a fresh FastEmbed cache directory to avoid an incomplete prior snapshot;
+  Hugging Face official download of `BAAI/bge-small-en-v1.5` completed.
+- Initial real encoding succeeded and produced a 384-dimensional `float32`
+  embedding vector.
+- Subsequent offline model initialization failed twice with ONNX Runtime
+  `bad allocation`, including a single-thread CPU attempt.
+- Status: model files are downloaded and the embedding path has succeeded once,
+  but repeated ONNX initialization is not yet stable. Do not treat the local
+  runtime as a reliable project dependency until the allocation failure is
+  understood or avoided.
+
+### 2026-06-23 - ONNX allocation stability resolution
+
+- Diagnostics: approximately 6.4 GB of memory was available; the ONNX model file
+  was complete at about 63 MB; direct ONNX Runtime model loading succeeded.
+- Resolution: configured FastEmbed with `CPUExecutionProvider`, `threads=1`, and
+  `enable_cpu_mem_arena=False`.
+- Verification: three independent offline Python processes each initialized the
+  model and returned a 384-dimensional embedding successfully.
+- Status: the local ONNX embedding runtime is stable with the documented session
+  settings. Next task: implement a small real-embedding retrieval exercise that
+  uses this configuration and preserves chunk sources.
+
+### 2026-06-23 - ONNX stability verification
+
+- Evidence: explained that disabling the arena and limiting threads changes
+  initialization/resource scheduling rather than model content, with performance
+  as the expected trade-off.
+- Status: understands the distinction between inference runtime configuration and
+  embedding-model semantics.
+- Next task: build the minimal real-embedding retrieval exercise using the stable
+  FastEmbed configuration and source-preserving result records.
+
+### 2026-06-23 - Stage 2 coding exercise: real ONNX embedding retrieval
+
+- Artifact: `codes/stage2_onnx_retrieval.py`.
+- Evidence: independently encoded document chunks and query with FastEmbed,
+  corrected the query shape from `(1, 384)` to `(384,)`, implemented vectorized
+  cosine similarity, paired scores with chunk metadata, and sorted results.
+- Verification: for `faulty item one week later`, real model scores ranked
+  `quality_exception` (0.701), `refund_deadline` (0.660), then `shipping`
+  (0.560); all results retained source fields.
+- Next task: add a relevance threshold or top-k policy so semantic ranking does
+  not automatically send weak candidates to the answer stage.
+
+### 2026-06-23 - Stage 2 verification: relevance threshold
+
+- Evidence: explained that only sufficiently similar text should become final
+  answer evidence, while low-similarity candidates should be excluded.
+- Status: understands that ranking is relative ordering and a threshold defines a
+  minimum evidence-relevance boundary.
+- Next task: compare threshold and top-k policies, then add one explicit filter
+  to the real embedding retrieval exercise.
+
+### 2026-06-23 - Stage 2 exercise: threshold and top-k
+
+- Evidence: correctly retained only the 0.701 candidate at a 0.70 threshold and
+  identified that top-k alone can select low-relevance text.
+- Correction: when no candidate passes a threshold, the default behavior is to
+  report insufficient evidence; lowering the threshold requires an explicit,
+  controlled fallback policy rather than an automatic attempt to force an answer.
+- Next task: add `threshold` and `top_k` parameters to the real embedding
+  retrieval function, then verify both a filtered result and an empty result.
+
+### 2026-06-23 - Stage 2 coding exercise: real embedding filtering
+
+- Evidence: added threshold filtering before appending candidates, sorted retained
+  results, and capped output with `results[:top_k]`.
+- Verification: `threshold=0.65`, `top_k=2` returned `quality_exception` and
+  `refund_deadline` but excluded `shipping`; `threshold=0.75` returned an empty
+  result and printed the controlled no-evidence message.
+- Status: completed real embedding retrieval with source preservation, threshold
+  filtering, and top-k capping.
+- Minor improvements noted: add default parameter values to `retrieve()`, and
+  cache document vectors instead of re-encoding them for each query.
+- Next task: build an evidence-based answer formatter that includes retrieved
+  source references and refuses to answer when retrieval is empty.
+
+### 2026-06-23 - Stage 2 verification: filter-order reasoning
+
+- Evidence: distinguished threshold as an absolute relevance boundary from top-k
+  as a relative quantity cap, and noticed that the operation order can produce
+  the same set in a simple single-score sorted list.
+- Correction learned: write threshold filtering before top-k to make the policy
+  explicit; order can matter once retrieval includes multiple scores, fusion, or
+  reranking stages.
+- Next task: build an evidence-based answer formatter that cites sources and
+  refuses unsupported answers when retrieval is empty.
+
+### 2026-06-23 - Stage 2 code review: evidence formatter (partial)
+
+- Evidence: added a `format_evidence_answer()` function and preserved source
+  fields in its intended result structure.
+- Gaps: the function is annotated to return `str` but returns `None` or a list;
+  it places `id` in the `text` field instead of the original chunk text; it is
+  not called from `main()`; and empty retrieval must return a refusal string
+  rather than only printing.
+- Next task: return one evidence-only string containing original text and source
+  citations, then call and print it for both non-empty and empty result sets.
+
+### 2026-06-23 - Stage 2 code review: evidence formatter (string assembly)
+
+- Evidence: corrected the empty-result branch to return a refusal string and
+  invoked the formatter from `main()` for the retrieved result set.
+- Gap: `{f"..."}` creates a one-item `set`, not a string, causing
+  `"\n".join(lines)` to fail because every list item must be a string.
+- Next task: append the formatted citation string directly, then rerun both the
+  evidence and empty-result paths.
+
+### 2026-06-23 - Stage 2 verification: evidence-based answer formatter
+
+- Evidence: `codes/stage2_onnx_retrieval.py` ran successfully in `.venv-py310`.
+  With `threshold=0.65`, it returned two original text excerpts with their
+  `source` values; with `threshold=0.75`, it returned the explicit
+  no-evidence refusal.
+- Correction learned: `{f"..."}` creates a one-item `set`; append the f-string
+  itself so that every `lines` element is a string and `"\n".join(lines)` works.
+- Next task: explain why preserving `id` along with text and source can still be
+  useful even though the current evidence answer displays only text and source.
+
+### 2026-06-23 - Stage 2 check-in: retrieval-result identifiers
+
+- Evidence: recognized that an `id` is useful in the retrieval workflow.
+- Correction: `id` normally does not take part in embedding or cosine-similarity
+  scoring. It is a stable identifier for locating a chunk, deduplicating results,
+  recording logs, and fetching the same source fragment again.
+- Next task: continue Stage 2 by separating retrieval output from the final
+  answer step, and identify which fields each step needs.
+## 2026-06-23 — Stage 2：检索输出结构与最终回答输入结构（诊断）
+
+- 已确认：检索结果需要保留稳定 `id`、原文 `text` 与可核查出处 `source`；最终回答只应接收排序、阈值过滤后的证据，避免低分和调试数据干扰回答。
+- 已确认：`score` 不必默认交给 LLM；保留它可支持后续路由或策略判断。无合格证据时必须进入明确的“证据不足”拒答路径。
+- 待补强：区分 `text`（可作为事实依据的内容）与 `source`（该内容的出处）；将空检索结果建模为结构化状态，而不是仅一条自然语言提示。
+- 下一任务：实现一个最小转换函数，将检索结果转换为最终回答输入，并验证正常与空结果两条路径。

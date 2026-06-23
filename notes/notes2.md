@@ -130,3 +130,103 @@ score = len(tokenize(query) & tokenize(chunk_text))
 对自然语言查询 `faulty item one week later`，即使 `quality_exception` 没有字面关键词重合，只要语义分数达到阈值（例如 `0.93 >= 0.70`）也应保留。`refund_deadline` 的语义分数达到阈值，也应保留，因为它给出默认期限；`quality_exception` 则给出例外。两者共同决定完整回答边界。
 
 候选规则可以写成：`lexical_score > 0 or semantic_score >= 0.70`。精确路径查询中，即使语义分数低于阈值，只要关键词命中就应保留，因为精确标识是强证据。
+
+## 混合检索代码练习
+
+`codes/stage2_retrieval.py` 新增了教学用的 `SEMANTIC_SCORES`，用固定分数模拟语义检索。`retrieve_hybrid()` 同时计算：
+
+- `lexical_score`：关键词交集分数；
+- `semantic_score`：模拟的语义相关度。
+
+保留规则为 `lexical_score > 0 or semantic_score >= 0.70`，结果保留 `id`、`text`、`source` 和两类分数，并按语义分数降序、词法分数降序排列。
+
+对 `faulty item one week later`，没有字面词重合的 `quality_exception` 仍因语义分数 `0.93` 排在第一；默认规则 `refund_deadline` 以 `0.72` 排在第二。两段原文和来源共同构成回答所需的默认规则与例外边界。这里的语义分数是教学模拟值，不是真实 embedding API 的输出。
+
+语义分数只表示“候选可能相关”，不等于事实证据。最终回答必须取回原文片段和 `source`：原文让 LLM 能依据具体规则作答，来源让用户能够核查，同时避免把分数本身误当成答案或承诺。
+
+## 离线 TF-IDF 向量检索
+
+`codes/stage2_tfidf_retrieval.py` 使用本地 `scikit-learn` 的 TF-IDF 与余弦相似度，不需要网络、API key 或模型下载。它是词法向量检索的基线，不是真实的语义 embedding。
+
+- `documents = [chunk["text"] for chunk in CHUNKS]` 只把文本送入 TF-IDF 建立文档向量；原始 `CHUNKS` 仍保留 `id` 和 `source`。
+- `vectorizer.fit_transform(documents)` 建立词表并生成文档矩阵；查询必须用同一词表的 `vectorizer.transform([query])`，不能对查询重新 `fit_transform()`。
+- `cosine_similarity(query_vector, document_matrix)` 返回形状为 `(1, 文档数)` 的二维分数矩阵：一行代表一个查询，列代表每个文档。`.flatten()` 把它转成一维数组，便于逐项处理。
+- `zip(CHUNKS, scores)` 按相同索引配对：`CHUNKS[0]` 对应 `scores[0]`。只要文档矩阵由同顺序的 `CHUNKS` 建立，配对就能正确取回 `id`、原文和来源。
+
+验证结果：`quality problem after 9 days` 时，`quality_exception` 得分最高；`faulty item one week later` 返回空结果。这说明 TF-IDF 能做离线向量与余弦计算，但仍无法理解同义词或改写。
+
+### 从 TF-IDF 过渡到真实 embedding 的环境要求
+
+真实本地 embedding 需要一个可导入的深度学习运行时和本地模型权重。已安装 `sentence-transformers`，但当前 `torch` 在 Windows 初始化 `c10.dll` 时失败，因此不能加载模型，也不应在修复运行时之前下载模型权重。查询向量化时必须复用文档已拟合的词表和权重：TF-IDF 用 `transform()`，不是重新 `fit_transform()`；真实 embedding 也要求查询和文档使用同一个模型。
+
+项目 `.venv` 中安装 CPU 版 PyTorch 后仍出现 `c10.dll` 的 `WinError 1114`，说明仅从 GPU 构建切换到 CPU 构建并未解决当前 Windows 运行时问题。应先验证运行时可导入，再安装 `sentence-transformers` 或下载模型；候选路线是尝试另一版 CPU PyTorch，或改用不依赖 PyTorch 的本地 ONNX embedding 运行时。
+
+ONNX 路线也已验证：`fastembed` 和 `onnxruntime` 可以安装，但导入 ONNX Runtime 时 `onnxruntime_pybind11_state` 同样发生 DLL 初始化失败。因此当前问题不是单一 PyTorch 包，而是此 `.venv` 中原生推理后端的共同运行时阻塞。应先切换到另一个基础解释器验证，或暂停真实本地 embedding，继续使用已验证的 TF-IDF 与模拟混合检索练习。
+
+使用独立的标准 Python 3.10 创建 `.venv-py310` 后，`onnxruntime` 与 `fastembed` 均可成功导入，证明 ONNX 路线可用。模型权重的首次获取是独立的网络步骤；`BAAI/bge-small-en-v1.5` 在当前网络下五分钟未下载完成，因此尚未产生真实 embedding。模型下载完成后才是真正离线：之后编码不需要网络。
+
+使用新的缓存目录重试 Hugging Face 官方源后，`BAAI/bge-small-en-v1.5` 已下载完成，并曾成功产生 384 维 `float32` embedding。后续在离线模式重载模型时，ONNX Runtime 两次报 `bad allocation`，即使限制为单线程 CPU 也未解决。模型文件存在不等于运行时稳定；必须连续成功加载和编码后，才能将本地 embedding 作为可靠依赖。
+
+### ONNX 内存分配稳定性
+
+诊断显示系统仍有约 6.4 GB 可用内存，模型文件完整（约 63 MB），且直接使用 ONNX Runtime 加载模型成功。因此 `bad allocation` 不是普通内存耗尽，也不是模型下载损坏。
+
+FastEmbed 的默认会话启用了 CPU 内存 arena。当前 Windows 环境的稳定配置是：
+
+```python
+TextEmbedding(
+    model_name="BAAI/bge-small-en-v1.5",
+    cache_dir=cache_dir,
+    providers=["CPUExecutionProvider"],
+    threads=1,
+    enable_cpu_mem_arena=False,
+)
+```
+
+这组参数指定 CPU 推理、限制线程数，并关闭 ONNX Runtime 的 CPU 内存 arena。离线模式下，三个独立 Python 进程均成功初始化模型并产生 384 维向量，因此可作为当前练习环境的稳定配置。
+
+关闭 arena 和限制为单线程只改变 ONNX 会话的内存管理与并行调度，不改变模型权重、tokenizer 或输入文本。因此同一输入的 embedding 语义不变；代价是吞吐量可能下降，但可避开当前环境的初始化分配错误。
+
+## 真实 ONNX embedding 检索练习
+
+`codes/stage2_onnx_retrieval.py` 已用真实 `BAAI/bge-small-en-v1.5` 向量完成最小检索。流程是：先把所有 chunk 文本编码为 `(文档数, 384)` 矩阵，再把 query 编码为 `(384,)` 向量，最后按余弦公式计算每个 chunk 的语义分数。
+
+对于 `faulty item one week later`，真实模型给出的排序是：
+
+- `quality_exception`：0.701；
+- `refund_deadline`：0.660；
+- `shipping`：0.560。
+
+这说明 embedding 能找出“faulty item”与“quality problems”的语义关联，但排序本身不等于最终证据选择。当前代码只排序、未设阈值，因此仍返回 `shipping`；下一步需要定义阈值或 top-k，并保留原文与 `source` 作为最终回答的证据。
+
+排序只给出候选之间的相对次序，不能判断最低分候选是否足够相关。阈值定义可作为最终回答证据的最低相似度；低于阈值的文本应排除，避免无关内容进入 LLM 上下文。
+
+## 阈值与 top-k
+
+阈值是绝对质量线，`top_k` 是候选数量上限。通常先保留 `score >= threshold` 的证据，再从中选择前 `top_k` 条，以同时控制相关性和上下文成本。
+
+对于分数 0.701、0.660、0.560：当 `threshold=0.70`、`top_k=2` 时只保留第一条；当 `threshold=0.75` 时没有候选。没有候选时默认应报告证据不足，不能为了生成答案而自动降低阈值。降级到较低阈值必须是明确设计的策略，必要时应由人确认。
+
+只使用 `top_k` 而不用阈值会在所有候选都低相关时仍强制选出若干文本，增加无关证据和幻觉风险。
+
+### 真实 embedding 的阈值过滤
+
+在真实 ONNX 检索代码中，阈值判断必须发生在 `results.append(...)` 之前：只有 `score >= threshold` 的 chunk 能成为候选；之后再按分数排序并返回 `results[:top_k]`。
+
+当前验证中：`threshold=0.65`、`top_k=2` 保留了 `quality_exception`（0.701）与 `refund_deadline`（0.660），排除了 `shipping`（0.560）；`threshold=0.75` 返回空列表，并由 `print_results()` 输出“没有可靠资料”。这把“无证据时停止”落实到了真实 embedding 路径。
+
+在“所有候选已按同一个分数降序排序”的简单场景里，先取 top-k 再按同一阈值过滤，和先阈值过滤再取 top-k 的最终集合通常相同。仍推荐将逻辑写为“阈值 -> top-k”，因为它明确表达了质量门槛优先于数量上限；当后续加入词法/语义融合、rerank 或多个评分信号时，候选截断的位置可能实际影响结果。
+
+## 基于证据的回答格式化
+
+检索结果是结构化数据：每项包含 `id`、`text`、`source` 和分数。最终回答至少要展示原文 `text` 与 `source`：原文限制回答只能依据已检索的证据，来源让用户能回到资料核查。若没有任何结果通过阈值，应明确回答“没有找到足够可靠的资料”，而不是为了生成答案降低标准或编造内容。
+
+可以先把各条证据字符串放入 `lines`，最后用 `"\n".join(lines)` 连接为一个字符串。`join` 的每一项都必须是字符串；`{f"..."}` 会创建一个只有一个元素的集合（`set`），不能传给 `join`。正确写法是直接追加 f-string：
+
+```python
+lines.append(f"- {result['text']} (来源：{result['source']})")
+```
+
+Python 的单引号和双引号都可表示字符串。示例中 `result['text']` 使用单引号，是为了不与外层 f-string 的双引号发生冲突；改成外层单引号、内层双引号也同样正确。
+
+`id` 是 chunk 的稳定标识。它通常不参与 embedding 或相似度计算，但可用于定位同一片段、结果去重、运行日志、调试，以及需要时再次从存储中取回对应的原文和元数据。

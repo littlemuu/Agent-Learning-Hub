@@ -25,6 +25,12 @@ CHUNKS = [
     },
 ]
 
+SEMANTIC_SCORES = {
+    "refund_deadline": 0.72,
+    "quality_exception": 0.93,
+    "shipping": 0.12,
+}
+
 
 def tokenize(text: str) -> set[str]:
     """Return lowercase words; remove a trailing 's' for this tiny demo."""
@@ -45,33 +51,31 @@ def score_chunk(query: str, chunk_text: str) -> int:
     return len(query_text&chunk_text)
 
 
-def retrieve(query: str) -> list[dict]:
-    """Return chunks with score > 0, ordered from highest score to lowest.
-
-    Each returned dictionary must preserve id, text, source, and add score.
-    TODO:
-    1. Score every item in CHUNKS with score_chunk().
-    2. Keep only chunks whose score is greater than zero.
-    3. Add the score to each retained result.
-    4. Sort results by score in descending order.
+def retrieve_hybrid(query: str) -> list[dict]:
+    """
+        保留 lexical_score > 0 或 semantic_score >= 0.70 的候选；
+        按 semantic_score 降序，再按 lexical_score 降序排序。
     """
     results=[]
     for chunk in CHUNKS:
         chunk_id=chunk["id"]
         chunk_text=chunk["text"]
         source=chunk["source"]
+        semantic_score=SEMANTIC_SCORES[chunk_id]
 
-        score=score_chunk(query,chunk_text)
-        if score>0:
+        lexical_score=score_chunk(query,chunk_text)
+        if lexical_score>0 or semantic_score>=0.70:
             result={
                 "id":chunk_id,
                 "text":chunk_text,
                 "source":source,
-                "score":score,
+                "lexical_score":lexical_score,
+                "semantic_score":semantic_score,
             }
             results.append(result)
-            
-    results.sort(key=lambda result:result["score"],reverse=True)
+
+    results.sort(key=lambda result:result["lexical_score"],reverse=True)        
+    results.sort(key=lambda result:result["semantic_score"],reverse=True)
     return results
 
 
@@ -85,19 +89,20 @@ def print_results(query: str, results: list[dict]) -> None:
 
     for result in results:
         print(f"id: {result['id']}")
-        print(f"score: {result['score']}")
+        print(f"lexical_score: {result['lexical_score']}")
+        print(f"semantic_score: {result['semantic_score']}")
         print(f"text: {result['text']}")
         print(f"source: {result['source']}")
         print()
 
 
 def main() -> None:
-    query = "quality problem after 9 days"
+    query = "faulty item one week later"
 
     # After you implement retrieve(), this should print quality_exception first
     # and include its source as evidence.
     try:
-        results = retrieve(query)
+        results = retrieve_hybrid(query)
     except NotImplementedError as exc:
         print(f"Exercise pending: {exc}")
         return
