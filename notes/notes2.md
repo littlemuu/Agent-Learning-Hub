@@ -230,3 +230,63 @@ lines.append(f"- {result['text']} (来源：{result['source']})")
 Python 的单引号和双引号都可表示字符串。示例中 `result['text']` 使用单引号，是为了不与外层 f-string 的双引号发生冲突；改成外层单引号、内层双引号也同样正确。
 
 `id` 是 chunk 的稳定标识。它通常不参与 embedding 或相似度计算，但可用于定位同一片段、结果去重、运行日志、调试，以及需要时再次从存储中取回对应的原文和元数据。
+
+## 检索输出结构 vs 最终回答输入结构
+
+检索输出面向系统内部，通常可以包含更多调试和策略字段，例如 `semantic_score`。这些字段帮助排序、阈值过滤、日志记录和后续路由，但不一定都应该交给最终回答环节。
+
+最终回答输入面向“生成答案”，应该更干净、更窄。当前练习中使用：
+
+```python
+{
+    "status": "ready",
+    "question": query,
+    "evidence": [
+        {"id": "...", "text": "...", "source": "..."}
+    ],
+}
+```
+
+这里 `text` 是可被引用的证据内容，`source` 是可核查出处，`id` 是稳定定位符。`semantic_score` 默认不传入最终回答输入，避免 LLM 把内部评分当成事实依据，也减少无关上下文。
+
+当没有证据通过阈值时，不应把空列表伪装成正常回答输入，而应明确进入结构化的拒答状态：
+
+```python
+{
+    "status": "insufficient_evidence",
+    "question": query,
+    "evidence": [],
+}
+```
+
+这样最终回答函数可以只根据 `status` 分支处理：`ready` 时基于证据回答，`insufficient_evidence` 时说明证据不足。这个状态比一句临时自然语言提示更可靠，因为后续代码可以稳定判断它。
+
+`assert` 可用于检查这种结构边界。例如：
+
+```python
+assert answer_input["status"] == "ready"
+assert "semantic_score" not in answer_input["evidence"][0]
+assert empty_input["status"] == "insufficient_evidence"
+assert empty_input["evidence"] == []
+```
+
+这些断言不是为了证明 embedding 分数一定正确，而是证明“检索结果已经被转换成适合最终回答的输入”。
+
+## 最终回答函数的边界
+
+最终回答函数应只接收 `answer_input`，不再直接接收检索阶段的 `results`、`threshold`、`top_k` 或 `semantic_score`。这是为了让回答阶段只关心两件事：当前证据是否足够回答，以及有哪些可引用的 `text` 和 `source`。
+
+一个最小实现可以按 `status` 分支：
+
+- `ready`：遍历 `answer_input["evidence"]`，把每条证据的原文和来源组织成回答。
+- `insufficient_evidence`：直接返回“没有找到足够可靠的资料，无法基于证据回答。”
+
+这样做的好处是把“检索策略”和“最终作答”分离：分数仍可用于检索排序、阈值过滤和调试，但不会被最终回答误当成事实依据。后续可以继续加强结构校验，例如遇到未知 `status`、缺少 `evidence` 字段或证据项缺少 `text/source` 时，应返回受控错误或拒答，而不是静默生成不可靠答案。
+
+未知 `status` 不应该被当成普通“证据不足”。`insufficient_evidence` 是检索正常完成但没有足够证据的业务状态；未知状态说明上游 pipeline 传入了不符合约定的数据，应该抛出 `ValueError`，并在错误信息中包含实际收到的状态值，方便定位是哪一步破坏了结构约定。
+
+`status="ready"` 与 `evidence=[]` 也是结构矛盾。`ready` 表示已经有足够证据进入回答阶段，因此 evidence 至少应包含一条证据；如果为空，说明上游状态构造有 bug，应该抛出 `ValueError`，不能返回空字符串，也不应把它混同为正常的 `insufficient_evidence`。
+
+在 `ready` 状态下，每条 evidence 至少需要 `text` 和 `source`。`text` 是回答可以依赖的原文证据，缺失时无法组织可靠回答；`source` 是可核查出处，缺失时无法提供引用。二者缺失都应视为结构错误并抛出 `ValueError`。
+
+当新的回答链路已经确定为 `retrieve -> build_answer_input -> generate_answer` 后，应删除旧的 `format_evidence_answer(query, results)`，而不是长期用三引号注释保留。删除旧接口能让文件里只剩一条清晰路径，减少后续维护者误用旧函数的可能，也让搜索函数名时更容易确认真实调用边界。

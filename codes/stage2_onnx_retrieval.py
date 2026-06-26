@@ -85,23 +85,6 @@ def retrieve(
     results.sort(key=lambda result: result["semantic_score"], reverse=True)
     return results[:top_k]
 
-
-def format_evidence_answer(query: str, results: list[dict]) -> str:
-    """把通过阈值的检索结果组织成可核查的证据答案。
-
-    这里只呈现原文片段和来源，不让模型补充检索结果之外的事实。
-    """
-    if not results:
-        return "没有找到足够可靠的资料，无法基于证据回答。"
-
-    lines = [f"针对问题“{query}”，基于检索到的证据："]
-    for result in results:
-        # 单引号和双引号都能表示字符串；这里用单引号可避免与外层双引号冲突。
-        lines.append(
-            f"- {result['text']} (来源：{result['source']})"
-        )
-    return "\n".join(lines)
-
 def print_results(query: str, results: list[dict]) -> None:
     """打印检索到的原文、来源与真实语义分数。"""
     print(f"Query: {query}")
@@ -117,32 +100,82 @@ def print_results(query: str, results: list[dict]) -> None:
         print(f"source: {result['source']}")
         print()
 
+def build_answer_input(query:str,results:list[dict])->dict:
+    ans={}
+    if results:
+        ans["status"]="ready"
+        ans["question"]=query
+        evi=[]
+        for result in results:
+            evi.append(
+                {
+                    "id":result['id'],
+                    "text":result['text'],
+                    "source":result['source']
+                }
+            )
+        ans["evidence"]=evi
+        return ans
+    
+    ans["status"]="insufficient_evidence"
+    ans["question"]=query
+    ans["evidence"]=[]
+    return ans
 
-def main() -> None:
+def generate_answer(answer_input:dict)->str:
+    final_results=""
+    status=answer_input["status"]
+    if status=="ready":
+        if not answer_input["evidence"]:
+            raise ValueError("Ready answer requires at least one evidence item.")
+        for evi in answer_input["evidence"]:
+            if "text" not in evi:
+                raise ValueError("Evidence item requires text.")
+            if "source" not in evi:
+                raise ValueError("Evidence item requires source.")
+            final_results+=f"{evi['text']}，来源：{evi['source']}。\n"
+        return final_results
+    
+    elif status=="insufficient_evidence":
+        final_results="没有找到足够可靠的资料，无法基于证据回答。"
+        return final_results
+    
+    raise ValueError(f"Unknown answer:{status}")
+
+def run_answer_tests()->None:
     # 模型已在本地缓存；设置离线模式，避免练习时再次发起网络请求。
     os.environ["HF_HUB_OFFLINE"] = "1"
     model = create_model()
     query = "faulty item one week later"
 
-    try:
-        results = retrieve(query, model, threshold=0.65, top_k=2)
-    except NotImplementedError as exc:
-        print(f"练习待完成：{exc}")
-        return
+    results = retrieve(query, model, threshold=0.65, top_k=2)
+    answer_input=build_answer_input(query,results)
+    print(answer_input)
+    assert answer_input["status"]=="ready"
+    assert "semantic_score" not in answer_input["evidence"][0]
 
     print_results(query, results)
-    print(format_evidence_answer(query, results))
+    print(generate_answer(answer_input))
+
     # 提高阈值，演示没有证据满足可靠性要求时的兜底回答。
-
-    try:
-        results = retrieve(query, model, threshold=0.75, top_k=2)
-    except NotImplementedError as exc:
-        print(f"练习待完成：{exc}")
-        return
+    results = retrieve(query, model, threshold=0.75, top_k=2)
+    answer_input=build_answer_input(query,results)
+    print(answer_input)
+    assert answer_input["status"]=="ready"
+    assert "semantic_score" not in answer_input["evidence"][0]
 
     print_results(query, results)
-    print(format_evidence_answer(query, results))
+    print(generate_answer(answer_input))
 
+    bad_input = {
+    "status": "ready",
+    "question": "test",
+    "evidence": [{"id": "x", "source": "policy.md"}],
+    }
+    print(generate_answer(bad_input))
 
+def main() -> None:
+    run_answer_tests()
+    
 if __name__ == "__main__":
     main()

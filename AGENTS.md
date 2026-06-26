@@ -42,6 +42,11 @@ After the user completes an assessment, lesson, exercise, or stage artifact:
    meets the stated success criteria.
 5. Keep `progress.md` concise and cumulative so a future session can resume without
    repeating the full baseline assessment.
+   Treat it as a compact resume card, not a full lesson transcript: keep only the
+   current stage, completed milestones, durable evidence, remaining gaps, current
+   files/environments, and the next concrete task. Move reusable explanations,
+   examples, and detailed corrections to the relevant `notes/` file instead of
+   expanding `progress.md`.
 6. Before starting a new lesson, read `progress.md` and continue from its current
    stage and next task.
 
