@@ -290,3 +290,22 @@ assert empty_input["evidence"] == []
 在 `ready` 状态下，每条 evidence 至少需要 `text` 和 `source`。`text` 是回答可以依赖的原文证据，缺失时无法组织可靠回答；`source` 是可核查出处，缺失时无法提供引用。二者缺失都应视为结构错误并抛出 `ValueError`。
 
 当新的回答链路已经确定为 `retrieve -> build_answer_input -> generate_answer` 后，应删除旧的 `format_evidence_answer(query, results)`，而不是长期用三引号注释保留。删除旧接口能让文件里只剩一条清晰路径，减少后续维护者误用旧函数的可能，也让搜索函数名时更容易确认真实调用边界。
+
+手工测试过的边界情况应尽量沉淀成可重复的自测函数。例如 `run_answer_tests()` 可以直接验证最终回答函数的结构约定：正常 `ready` 会输出证据文本和来源，`insufficient_evidence` 会拒答，未知 `status`、`ready` 但空 evidence、证据项缺少 `text/source` 都会抛出 `ValueError`。这样后续改动回答格式或接入真实 LLM 时，可以快速发现接口约定是否被破坏。
+
+## 文档索引与查询向量复用
+
+真实 RAG 中，文档侧向量通常属于索引构建阶段：只要 chunk 内容和 embedding 模型不变，`document_vectors` 就可以缓存或复用。用户问题每次可能不同，因此 `query_vector` 属于查询阶段，需要按当前 query 重新生成。
+
+当前练习将流程拆成：
+
+```text
+prepare_documents(model) -> index
+retrieve_from_index(query, model, index, threshold, top_k) -> results
+build_answer_input(query, results) -> answer_input
+generate_answer(answer_input) -> answer
+```
+
+这样连续查询多个问题时，不必每次重新 embedding 全部文档，只需要复用 `index["document_vectors"]`，再为每个新问题计算一次 query embedding。当前模型缓存仍位于 TEMP 目录：`fastembed-cache-py310`。如果 TEMP 被系统清理，需要重新下载模型。
+
+索引字段命名要保持前后一致。当前使用 `document_vectors` 表示“文档向量矩阵”这个整体；如果构建阶段写成 `documents_vectors`，检索阶段写成 `document_vectors`，就会触发 `KeyError`。当索引复用路径跑通后，应删除旧的 `retrieve()`，避免文件里同时存在“每次重新 embed 文档”和“复用索引”的两条检索路径。

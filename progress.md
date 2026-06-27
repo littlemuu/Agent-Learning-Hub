@@ -104,3 +104,8 @@
 - 2026-06-26: 验证理解：能说明 ready 状态下的证据项缺少 `text` 应报错，因为没有原文证据就无法组织可靠回答。
 - 2026-06-26: 完成 evidence 字段校验；缺少 `text` 或 `source` 的证据项都会触发 `ValueError`，正常回答路径仍运行通过。
 - 2026-06-26: 完成接口收口；已删除旧 `format_evidence_answer()`，`main()` 只保留 `retrieve -> build_answer_input -> generate_answer` 路径，脚本运行通过。
+- 2026-06-26: 完成 `run_answer_tests()` 自测函数；覆盖正常回答、证据不足、未知 status、ready 空 evidence、缺少 `text/source` 五类情况。脚本运行通过并输出 `answer tests passed`。
+- 2026-06-27: 进入索引复用练习；能说明 `query_vector` 随用户输入变化不能复用，选择 `prepare_documents()` 作为文档侧索引构建函数名。需修正理解：连续查询时最昂贵的重复步骤是重新 embedding 全部文档，而不只是解析 document。
+- 2026-06-27: 重新下载 `BAAI/bge-small-en-v1.5` 到 TEMP FastEmbed 缓存，验证可生成 384 维向量；`prepare_documents()` + `retrieve_from_index()` 路径运行通过，两次查询复用同一个文档索引并输出 `answer tests passed`。
+- 2026-06-27: 完成索引复用路径收口；统一索引字段名为 `document_vectors`，删除旧 `retrieve()`，文件中只保留 `prepare_documents()` + `retrieve_from_index()` 检索路径。脚本运行通过。
+- 2026-06-27: 检索层自测诊断：能说明 `document_vectors` 行数必须与 `CHUNKS` 对齐，排序异常可能来自分数计算、索引错位或 embedding/阈值变化；检索测试应早于回答测试，因为检索证据错误时不应继续组织答案。

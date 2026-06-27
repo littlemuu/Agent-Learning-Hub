@@ -43,6 +43,15 @@ def embed_texts(model: TextEmbedding, texts: list[str]) -> np.ndarray:
     return matrix
 
 
+def prepare_documents(model)->dict:
+    documents = [chunk["text"] for chunk in CHUNKS]
+    document_vectors = embed_texts(model, documents)
+    return{
+        "chunks":CHUNKS,
+        "document_vectors":document_vectors,
+    }
+
+
 def cosine_scores(query_vector: np.ndarray, document_vectors: np.ndarray) -> np.ndarray:
     """计算一个 query 向量与所有文档向量的余弦相似度。
 
@@ -59,20 +68,12 @@ def cosine_scores(query_vector: np.ndarray, document_vectors: np.ndarray) -> np.
     return scores
 
 
-def retrieve(
-    query: str, model: TextEmbedding, threshold: float, top_k: int
-) -> list[dict]:
-    """用真实 embedding 检索 query，并保留每个 chunk 的来源信息。
-
-    先用 threshold 过滤掉低相关结果，再用 top_k 限制最多返回的数量。
-    因此 threshold 是“是否足够相关”的绝对门槛，top_k 是结果数量上限。
-    """
-    documents = [chunk["text"] for chunk in CHUNKS]
-    query_vector = embed_texts(model, [query])[0]
-    document_vectors = embed_texts(model, documents)
-    scores = cosine_scores(query_vector, document_vectors)
-    results = []
-    for chunk, score in zip(CHUNKS, scores):
+def retrieve_from_index(query:str,model:TextEmbedding,index:dict,
+                        threshold:float=0.65,top_k:int=2)->list[dict]:
+    query_vector=embed_texts(model,[query])[0]
+    scores=cosine_scores(query_vector,index["document_vectors"])
+    results=[]
+    for chunk, score in zip(index["chunks"], scores):
         if score >= threshold:
             results.append(
                 {
@@ -142,13 +143,79 @@ def generate_answer(answer_input:dict)->str:
     
     raise ValueError(f"Unknown answer:{status}")
 
+def assert_raises_value_error(answer_input: dict, expected_message: str) -> None:
+    try:
+        generate_answer(answer_input)
+    except ValueError as exc:
+        assert expected_message in str(exc)
+        return
+    raise AssertionError("Expected ValueError, but generate_answer returned normally.")
+
 def run_answer_tests()->None:
+    ready_input = {
+        "status": "ready",
+        "question": "test",
+        "evidence": [
+            {
+                "id": "x",
+                "text": "Refund requests must be submitted within 7 days.",
+                "source": "policy.md",
+            }
+        ],
+    }
+    ready_answer = generate_answer(ready_input)
+    assert "Refund requests" in ready_answer
+    assert "policy.md" in ready_answer
+
+    insufficient_input = {
+        "status": "insufficient_evidence",
+        "question": "test",
+        "evidence": [],
+    }
+    assert generate_answer(insufficient_input) == "没有找到足够可靠的资料，无法基于证据回答。"
+
+    assert_raises_value_error(
+        {
+            "status": "weird_status",
+            "question": "test",
+            "evidence": [],
+        },
+        "Unknown answer",
+    )
+    assert_raises_value_error(
+        {
+            "status": "ready",
+            "question": "test",
+            "evidence": [],
+        },
+        "at least one evidence",
+    )
+    assert_raises_value_error(
+        {
+            "status": "ready",
+            "question": "test",
+            "evidence": [{"id": "x", "source": "policy.md"}],
+        },
+        "requires text",
+    )
+    assert_raises_value_error(
+        {
+            "status": "ready",
+            "question": "test",
+            "evidence": [{"id": "x", "text": "Some evidence."}],
+        },
+        "requires source",
+    )
+    print("answer tests passed")
+
+def main() -> None:
     # 模型已在本地缓存；设置离线模式，避免练习时再次发起网络请求。
     os.environ["HF_HUB_OFFLINE"] = "1"
     model = create_model()
     query = "faulty item one week later"
+    index=prepare_documents(model)
 
-    results = retrieve(query, model, threshold=0.65, top_k=2)
+    results = retrieve_from_index(query, model,index, threshold=0.65, top_k=2)
     answer_input=build_answer_input(query,results)
     print(answer_input)
     assert answer_input["status"]=="ready"
@@ -158,23 +225,14 @@ def run_answer_tests()->None:
     print(generate_answer(answer_input))
 
     # 提高阈值，演示没有证据满足可靠性要求时的兜底回答。
-    results = retrieve(query, model, threshold=0.75, top_k=2)
-    answer_input=build_answer_input(query,results)
+    results = retrieve_from_index(query, model, index, threshold=0.75, top_k=2)
+    answer_input = build_answer_input(query, results)
     print(answer_input)
-    assert answer_input["status"]=="ready"
-    assert "semantic_score" not in answer_input["evidence"][0]
+    assert answer_input["status"] == "insufficient_evidence"
+    assert answer_input["evidence"] == []
 
     print_results(query, results)
     print(generate_answer(answer_input))
-
-    bad_input = {
-    "status": "ready",
-    "question": "test",
-    "evidence": [{"id": "x", "source": "policy.md"}],
-    }
-    print(generate_answer(bad_input))
-
-def main() -> None:
     run_answer_tests()
     
 if __name__ == "__main__":
