@@ -12,7 +12,8 @@ Read these before starting work:
 
 1. `progress.md` for the current position, verified gaps and single next task.
 2. `README.md` for milestones, quality bar and repository conventions.
-3. The active project's code, tests and run results for implementation truth.
+3. The active project's `PROJECT.md` for stable scope and decisions.
+4. The active project's `PROGRESS.md`, code, tests and run results for implementation truth.
 
 When documentation conflicts with verified code or tests, trust the reproducible evidence and fix the stale document in the same scoped change.
 
@@ -53,13 +54,14 @@ Start with the smallest useful slice. Do not add multi-agent coordination, brows
 - Keep repository-level direction in `README.md`.
 - Keep only the compact resume state in `progress.md`.
 - Put a selected implementation under `projects/<project-name>/`.
-- Give each project its own dependency declaration, tests and README when needed.
+- Keep stable project scope and decisions in `PROJECT.md`; keep only current status and one next task in the project's `PROGRESS.md`.
+- Give each project its own dependency declaration, tests and user-facing README when implementation begins.
 - Put durable architecture decisions under `docs/decisions/` only after that directory becomes useful.
 - Never commit virtual environments, model caches, credentials, local editor state or generated build artifacts.
 
 ## Progress Updates
 
-Update `progress.md` only after verified milestones or material plan changes. Record:
+Update root `progress.md` only after global milestones or material direction changes. Update the active project's `PROGRESS.md` after verified project milestones or material plan changes. Record:
 
 - capability or artifact;
 - concrete evidence;
