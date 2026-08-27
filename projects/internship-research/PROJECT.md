@@ -1,6 +1,6 @@
 # Internship Research Agent — Project Context
 
-Status: selected; first vertical slice specified; implementation not started.
+Status: active; offline phase one complete; grounded model extraction not started.
 
 This file is the stable source of truth for project scope and decisions. Current work state and the single next task live in [PROGRESS.md](PROGRESS.md).
 
@@ -24,6 +24,20 @@ Initial flow:
 
 The first usable entry point should be a CLI. A blocked or unreadable URL is an explicit acquisition failure, not permission to infer missing content.
 
+## Implemented Offline Baseline
+
+Phase one establishes the executable contract before adding a model or acquisition tool:
+
+- strict Pydantic models for CandidateProfile, Evidence, JobSnapshot, assessments, Verdict and DecisionCard;
+- one anonymized, hand-labeled `jd_001` fixture with an oracle;
+- a CLI that reads local UTF-8 JD text plus a candidate profile and writes a schema-valid DecisionCard;
+- exact-quote evidence checks, evidence-reference integrity checks and explicit unknown fields;
+- deterministic hard-constraint, fit-dimension and three-state verdict logic;
+- a separate actual-versus-oracle comparator;
+- six pytest cases covering the oracle match, missing evidence, a duration conflict, strict typing, an unknown evidence reference and the CLI/comparator red-green path.
+
+The current extractor intentionally recognizes only the controlled `jd_001` wording. It is an executable contract fixture, not a general JD parser. It performs no network access and calls no model.
+
 ## Input And Output Contract
 
 ### Input
@@ -34,7 +48,7 @@ The first usable entry point should be a CLI. A blocked or unreadable URL is an 
 
 ### DecisionCard
 
-- source URL or pasted-text identifier, observation time and content hash;
+- source URL or pasted-text identifier; acquisition-backed runs later add observation time and content hash;
 - confirmed company, role, location, work mode, responsibilities, requirements and timing;
 - an evidence quote and source reference for every confirmed fact;
 - explicit unknown fields;
