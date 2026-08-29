@@ -1,0 +1,50 @@
+{
+  "candidate_id": "candidate_001",
+  "target_roles": [
+    "agent_engineering_intern"
+  ],
+  "skills": [
+    "Python",
+    "Git",
+    "LLM API",
+    "C++"
+  ],
+  "project_evidence": [
+    {
+      "project_id": "project_001",
+      "summary": "Built a Python tool-calling assistant and repeatable evaluation cases.",
+      "skills": [
+        "Python",
+        "Git",
+        "LLM API"
+      ]
+    },
+    {
+      "project_id": "project_002",
+      "summary": "Implemented and tested request handling in a small C++ network service.",
+      "skills": [
+        "C++",
+        "Git"
+      ]
+    }
+  ],
+  "location_preferences": {
+    "acceptable_cities": [
+      "上海",
+      "苏州"
+    ],
+    "acceptable_work_modes": [
+      "hybrid",
+      "remote"
+    ],
+    "max_onsite_days_per_week": 3
+  },
+  "availability": {
+    "days_per_week": 4,
+    "duration_months": 5
+  },
+  "work_preferences": {
+    "low_overtime": "required",
+    "mentorship": "preferred"
+  }
+}

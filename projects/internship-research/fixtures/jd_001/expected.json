@@ -1,0 +1,190 @@
+{
+  "fixture_id": "jd_001",
+  "evidence": [
+    {
+      "evidence_id": "ev_heading",
+      "source_path": "job.txt",
+      "quote": "星桥智能（虚构公司）— Agent 工程实习生"
+    },
+    {
+      "evidence_id": "ev_workplace",
+      "source_path": "job.txt",
+      "quote": "工作地点：上海，混合办公，每周至少到岗 3 天。"
+    },
+    {
+      "evidence_id": "ev_duration",
+      "source_path": "job.txt",
+      "quote": "实习周期：至少 4 个月。"
+    },
+    {
+      "evidence_id": "ev_agent_work",
+      "source_path": "job.txt",
+      "quote": "- 使用 Python 开发带工具调用能力的 Agent。"
+    },
+    {
+      "evidence_id": "ev_eval_work",
+      "source_path": "job.txt",
+      "quote": "- 为 Agent 输出设计可重复运行的评测。"
+    },
+    {
+      "evidence_id": "ev_failure_work",
+      "source_path": "job.txt",
+      "quote": "- 记录失败案例并改进提示词与工具契约。"
+    },
+    {
+      "evidence_id": "ev_python_git",
+      "source_path": "job.txt",
+      "quote": "- 熟悉 Python 和 Git。"
+    },
+    {
+      "evidence_id": "ev_llm_api",
+      "source_path": "job.txt",
+      "quote": "- 理解大语言模型 API 的基本调用方式。"
+    },
+    {
+      "evidence_id": "ev_project",
+      "source_path": "job.txt",
+      "quote": "- 能清楚说明自己参与过的一个软件项目。"
+    },
+    {
+      "evidence_id": "ev_cpp",
+      "source_path": "job.txt",
+      "quote": "- 有 C++ 项目经验。"
+    }
+  ],
+  "expected_job_snapshot": {
+    "company": {
+      "value": "星桥智能",
+      "evidence_refs": ["ev_heading"]
+    },
+    "role": {
+      "value": "Agent 工程实习生",
+      "evidence_refs": ["ev_heading"]
+    },
+    "city": {
+      "value": "上海",
+      "evidence_refs": ["ev_workplace"]
+    },
+    "work_mode": {
+      "value": "hybrid",
+      "evidence_refs": ["ev_workplace"]
+    },
+    "minimum_onsite_days_per_week": {
+      "value": 3,
+      "evidence_refs": ["ev_workplace"]
+    },
+    "minimum_duration_months": {
+      "value": 4,
+      "evidence_refs": ["ev_duration"]
+    },
+    "responsibilities": [
+      {
+        "value": "使用 Python 开发带工具调用能力的 Agent",
+        "evidence_refs": ["ev_agent_work"]
+      },
+      {
+        "value": "为 Agent 输出设计可重复运行的评测",
+        "evidence_refs": ["ev_eval_work"]
+      },
+      {
+        "value": "记录失败案例并改进提示词与工具契约",
+        "evidence_refs": ["ev_failure_work"]
+      }
+    ],
+    "required_skills": [
+      {
+        "value": "Python",
+        "evidence_refs": ["ev_python_git"]
+      },
+      {
+        "value": "Git",
+        "evidence_refs": ["ev_python_git"]
+      },
+      {
+        "value": "LLM API",
+        "evidence_refs": ["ev_llm_api"]
+      }
+    ],
+    "project_evidence_required": {
+      "value": true,
+      "evidence_refs": ["ev_project"]
+    },
+    "bonus_skills": [
+      {
+        "value": "C++",
+        "evidence_refs": ["ev_cpp"]
+      }
+    ]
+  },
+  "expected_unknown_fields": [
+    "salary",
+    "education_requirement",
+    "overtime",
+    "mentorship",
+    "application_deadline"
+  ],
+  "expected_constraints": [
+    {
+      "name": "city",
+      "status": "met",
+      "reason": "上海在候选人的可接受城市中。"
+    },
+    {
+      "name": "work_mode",
+      "status": "met",
+      "reason": "hybrid 在候选人的可接受办公方式中。"
+    },
+    {
+      "name": "onsite_days",
+      "status": "met",
+      "reason": "岗位最低到岗 3 天，候选人最多接受到岗 3 天。"
+    },
+    {
+      "name": "duration",
+      "status": "met",
+      "reason": "候选人可实习 5 个月，满足岗位至少 4 个月的要求。"
+    },
+    {
+      "name": "low_overtime",
+      "status": "unknown",
+      "reason": "JD 未说明加班情况。"
+    },
+    {
+      "name": "mentorship",
+      "status": "unknown",
+      "reason": "JD 未说明导师制度。"
+    }
+  ],
+  "expected_dimensions": [
+  {
+    "name": "role_direction",
+    "status": "match",
+    "reason": "候选人的目标岗位包含 Agent 工程实习方向。"
+  },
+  {
+    "name": "required_skills",
+    "status": "match",
+    "reason": "候选人的技能与项目证据覆盖 Python、Git 和 LLM API。"
+  },
+  {
+    "name": "bonus_skills",
+    "status": "match",
+    "reason": "候选人具有 C++ 项目经验，满足岗位加分项。"
+  },
+  {
+    "name": "location_and_work_mode",
+    "status": "match",
+    "reason": "上海和 hybrid 均在候选人的可接受范围内，且到岗天数边界一致。"
+  },
+  {
+    "name": "sustainability",
+    "status": "unknown",
+    "reason": "JD 未说明加班情况和导师制度。"
+  }
+],
+  "expected_verdict": {
+    "status": "needs_verification",
+    "reason": "地点、办公方式、实习周期和技能要求均匹配，但低加班是候选人的必要条件，而 JD 没有提供加班信息。",
+    "next_action": "向招聘方确认常规工作时长、加班情况和导师安排。"
+  }
+}

@@ -1,6 +1,6 @@
 # Learning Progress
 
-Last updated: 2026-08-25
+Last updated: 2026-08-27
 
 ## Target
 
@@ -11,10 +11,11 @@ Last updated: 2026-08-25
 ## Current Position
 
 - The first project is selected: **Internship Research Agent**.
-- Its first vertical slice is one candidate profile plus one public job URL or pasted JD to one evidence-backed DecisionCard.
+- Offline phase one is implemented: one candidate profile plus one controlled JD now produces an evidence-backed DecisionCard through a tested CLI path.
+- The implementation milestone is preserved at [commit 30529d6](https://github.com/littlemuu/Agent-Learning-Hub/commit/30529d663d033486e689065a909b55918326efc2).
 - Stable project decisions are in [projects/internship-research/PROJECT.md](projects/internship-research/PROJECT.md).
 - Current project work and its single next task are in [projects/internship-research/PROGRESS.md](projects/internship-research/PROGRESS.md).
-- The earlier implementation in [littlemuu/hello-agents:internship-agent](https://github.com/littlemuu/hello-agents/tree/internship-agent) was audited and will remain a historical reference rather than an implementation base.
+- The earlier implementation in [littlemuu/hello-agents:internship-agent](https://github.com/littlemuu/hello-agents/tree/internship-agent) remains a historical reference rather than an implementation base.
 
 ## Verified Capabilities
 
@@ -23,6 +24,10 @@ Last updated: 2026-08-25
 - Understands retrieval, source, citation, threshold, top-k and explicit insufficient-evidence behavior.
 - Has related practical experience with MCP, OAuth, permission gates, deployment, CI, diagnostics and Skill packaging.
 - Can identify scope inflation, evidence breaks and uncalibrated decision logic in an existing Agent application.
+- Can define strict structured-output contracts and separate structural validation from cross-file evidence validation.
+- Can construct a hand-labeled oracle, enforce exact source quotes and preserve unsupported facts as unknown.
+- Can implement deterministic hard constraints and three-state verdict behavior behind a CLI.
+- Can test both schema-invalid failures and schema-valid but semantically wrong outputs; the current project suite has 6 passing tests.
 
 Historical in-repository evidence is preserved at [legacy snapshot c226e51](https://github.com/littlemuu/Agent-Learning-Hub/tree/c226e51dc07cf428e49d284a86d1ba898ccfa10e).
 
@@ -33,18 +38,18 @@ Historical in-repository evidence is preserved at [legacy snapshot c226e51](http
 - Do not use a free-form 0–100 total match score.
 - Do not build UI, SSE, application tracking, multi-agent, RAG or long-term memory before the core eval gate passes.
 - Keep real personal profile data local and ignored.
+- Keep downstream decision logic deterministic even after model extraction is introduced.
 
 ## Remaining Gaps
 
-- Define executable schemas for profile, snapshot, evidence and decision card.
-- Build the first deterministic offline fixture path.
-- Add grounded real-model extraction, a read-only acquisition tool, trace and explicit failure behavior.
-- Expand to at least 20 eval cases and add CI.
+- Replace the fixture-specific extractor with grounded real-model extraction while retaining the current evidence and schema gates.
+- Add a read-only acquisition tool, trace and explicit timeout or blocked-page failure behavior.
+- Expand from 1 to at least 20 eval cases and add CI.
 - Produce a concise portfolio explanation with architecture, trade-offs, failures, limits, cost and latency.
 
 ## Single Next Task
 
-Implement and test one offline fixture to a schema-valid, evidence-backed DecisionCard CLI path, with no real network or LLM and no API or UI.
+Add grounded real-model extraction for pasted JD text behind the existing DecisionCard schema, exact-quote evidence validation and deterministic assessment logic. Use a deterministic fake for tests and do not add network acquisition or UI yet.
 
 ## Update Rule
 
